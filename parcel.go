@@ -28,7 +28,7 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		return 0, err
 	}
 	// верните идентификатор последней добавленной записи
-	return int(id), nil //return 0, nil???
+	return int(id), nil
 }
 
 func (s ParcelStore) Get(number int) (Parcel, error) {
@@ -88,7 +88,7 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 		"UPDATE parcel SET status = ? WHERE number = ?",
 		status, number,
 	)
-	return err // return nil???
+	return err
 }
 
 func (s ParcelStore) SetAddress(number int, address string) error {
@@ -96,20 +96,26 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 	// менять адрес можно только если значение статуса registered
 
 	// Проверяем, что посылка в статусе "registered"
-	parcel, err := s.Get(number)
+
+	result, err := s.db.Exec(
+		"UPDATE parcel SET address = ? WHERE number = ? AND status = ?",
+		address, number, ParcelStatusRegistered,
+	)
 	if err != nil {
 		return err
 	}
 
-	if parcel.Status != ParcelStatusRegistered {
-		return errors.New("нельзя изменить адрес: посылка не в статусе 'зарегистрирована'")
+	// Проверяем, была ли обновлена хотя бы одна строка
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
 	}
 
-	_, err = s.db.Exec(
-		"UPDATE parcel SET address = ? WHERE number = ?",
-		address, number,
-	)
-	return err // return nil???
+	if rowsAffected == 0 {
+		return errors.New("нельзя изменить адрес: посылка не найдена или не в статусе 'зарегистрирована'")
+	}
+
+	return nil
 }
 
 func (s ParcelStore) Delete(number int) error {
@@ -117,18 +123,23 @@ func (s ParcelStore) Delete(number int) error {
 	// удалять строку можно только если значение статуса registered
 
 	// Проверяем, что посылка в статусе "registered"
-	parcel, err := s.Get(number)
+	result, err := s.db.Exec(
+		"DELETE FROM parcel WHERE number = ? AND status = ?",
+		number, ParcelStatusRegistered,
+	)
 	if err != nil {
 		return err
 	}
 
-	if parcel.Status != ParcelStatusRegistered {
-		return errors.New("нельзя удалить посылку: посылка не в статусе 'зарегистрирована'")
+	// Проверяем, была ли удалена хотя бы одна строка
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
 	}
 
-	_, err = s.db.Exec(
-		"DELETE FROM parcel WHERE number = ?",
-		number,
-	)
-	return err //return nil???
+	if rowsAffected == 0 {
+		return errors.New("нельзя удалить посылку: посылка не найдена или не в статусе 'зарегистрирована'")
+	}
+
+	return nil
 }
